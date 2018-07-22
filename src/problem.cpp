@@ -170,7 +170,7 @@ void readPartition(string file){
 };
 string  part()
 {
-  string fileConvert = "./fileConvert ";
+  string fileConvert = "fileConverter/fileConvert ";
   fileConvert.append(string(inputFile)).append(" p");
   int sr =system (fileConvert.c_str());
   if(sr == -1){
