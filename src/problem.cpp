@@ -21,7 +21,6 @@ int v1=0;
 vector<bool> assignG;
 // construct the Problem with fill information of the input file
 void readFile(){
-	//cout<< "in readFile"<<endl;
 	ifstream fp;
 	//fp.open("Debug/instance.cnf",std::ios::in);
 	fp.open(inputFile,std::ios::in);
@@ -74,10 +73,10 @@ void memAllocate(string buff){
 		negOc0[i] = 0;
 	}
 	for(int i = 0; i < numVsG; i++){
-		posOc0[i] = 0;
+		posOc1[i] = 0;
 	}
 	for(int i = 0; i < numVsG; i++){
-		negOc0[i] = 0;
+		negOc1[i] = 0;
 	}
 	clauseT0.reserve(numVsG);
 	clauseT1.reserve(numVsG);
@@ -124,11 +123,15 @@ void parseLine(string line){
 			clauseT0.push_back(index);
 		    posOc0[index]++;
 		}
-		else{
-			clauseT1.push_back(index);
-		    posOc1[index]++;
-		}
 
+		else{
+	    	//cout<< "1"<<lit<<endl;
+			clauseT1.push_back(index);
+	    	//cout<< "2"<<index<<endl;
+		    posOc1[index]++;
+	    	//cout<< "3"<<lit<<endl;
+	    	//cout<< "end"<<lit<<endl;
+		}
 	    size++;
 		token = strtok(NULL, s);
     }
@@ -198,7 +201,8 @@ string  part()
   }
   std::array<char, 128> buffer;
   std::string result;
-  string a = "find *.KaHyPar";
+  string a = "find ";
+  a.append(string(inputFile).append("*.KaHyPar"));
   const char* cmd =a.c_str();
   std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
   if (!pipe) throw std::runtime_error("popen() failed!");
