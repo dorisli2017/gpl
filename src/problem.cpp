@@ -172,19 +172,30 @@ string  part()
 {
   string fileConvert = "./fileConvert ";
   fileConvert.append(string(inputFile)).append(" p");
-  system (fileConvert.c_str());
-  string Kahypar = "./kahypar/build/kahypar/application/KaHyPar -h ";// other programm possible
+  int sr =system (fileConvert.c_str());
+  if(sr == -1){
+	perror("fileConvert fails");
+	exit(EXIT_FAILURE);
+
+  }
+
+  string Kahypar = "../kahypar/build/kahypar/application/KaHyPar -h ";// other programm possible
   string block = " -k 2";// numThreads
   string imbalance = " -e 0.03";
   string object = " -o km1";// km1 :(lambda-1) metric , cut: cut-net metric
   string mode =" -m direct";// partition mode: direct: k-way, recursive: bisection recursive
-  string preset0 = " -p kahypar/config/km1_direct_kway_sea18.ini";
+  string preset0 = " -p ../kahypar/config/km1_direct_kway_sea18.ini";
   string preset1 = " -p ../../../config/km1_direct_kway_gecco18.ini";
   string preset2 = " -p ../../../config/km1_direct_kway_sea17.ini";
   string preset3 =" -p ../../../config/km1_direct_kway_alenex17.ini";
   string preset4 =" -p ../../../config/cut_rb_alenex16.ini";
   Kahypar.append(string(inputFile).append(".p")).append(block).append(imbalance).append(object).append(mode).append(preset0).append("> /dev/null");
-  system (Kahypar.c_str());
+  sr = system (Kahypar.c_str());
+  if(sr == -1){
+	perror("Kahypar fails");
+	exit(EXIT_FAILURE);
+
+  }
   std::array<char, 128> buffer;
   std::string result;
   string a = "find *.KaHyPar";
