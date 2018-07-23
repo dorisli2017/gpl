@@ -24,6 +24,11 @@ int main(int argc, char *argv[]){
 	v0 = numVsG;
 	v1 = 0;*/
 	readFile();
+	cout<<endl;
+	cout<<"c0:" <<c0<<endl;
+	cout<<"c1:"<<c1<<endl;
+	cout<<"v0:" <<v0<<endl;
+	cout<<"v1:"<<v1<<endl;
 	//debugProblem();
 	int tid;
 #pragma omp parallel num_threads(2) private(tid)

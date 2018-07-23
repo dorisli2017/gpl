@@ -203,7 +203,6 @@ void Process<T>::setAssignment(){
 
 template<class T>
 void Process<T>::optimal(){
-	cout<< "start optimal";
 	int rct;
 	while(true){
 		for(int i = 0; i < maxFlips; i++){

@@ -104,22 +104,31 @@ void testLine(string line, vector<bool>& assign){
     const char s[2] = " ";
     int lit;
     int numT=0;
+    int q0=0;
+    int q1=0;
     char* token = strtok(str, s);
     while(token != NULL){
 		if(*token== '-'){
 			lit = atoi(token);
 			if(assign[-lit] == false) numT++;
+			if(partition[-lit] == 0) q0++;
+			else q1++;
 			token = strtok(NULL, s);
 			continue;
 		}
 		if(*token == '0'){
+			if(q0 >0 && q1>0) return;
 			if(numT == 0){
 				perror("TEST FAILURE");
 				exit(EXIT_FAILURE);
 			}
+			q0=0;
+			q1=0;
 		    return;
 		}
 		lit = atoi(token);
+		if(partition[lit] == 0) q0++;
+		else q1++;
 		if(assign[lit] == true) numT++;
 		token = strtok(NULL, s);
     }

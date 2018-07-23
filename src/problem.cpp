@@ -105,13 +105,15 @@ void parseLine(string line){
 			continue;
 		}
 		if(*token == '0'){
-			if(clauseT0.size()> clauseT1.size()){
+			if(clauseT0.size()> clauseT1.size() && clauseT1.size()==0 ){
 				clauses0[c0]=clauseT0;
 				c0++;
 			}
 			else {
-				clauses1[c1]=clauseT1;
-				c1++;
+				if(clauseT0.size()==0){
+					clauses1[c1]=clauseT1;
+					c1++;
+				}
 			}
 			clauseT0.clear();
 			clauseT1.clear();
@@ -203,6 +205,7 @@ string  part()
   std::string result;
   string a = "find ";
   a.append(string(inputFile).append("*.KaHyPar"));
+  cout<< a;
   const char* cmd =a.c_str();
   std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
   if (!pipe) throw std::runtime_error("popen() failed!");
