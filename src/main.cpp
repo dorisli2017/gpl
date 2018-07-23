@@ -15,6 +15,14 @@ int main(int argc, char *argv[]){
 	inputFile = argv[1];
 	string result = part();
 	readPartition(result);
+/*	assert(partition.size() == numVsG);
+	assert(ind.size() == numVsG);
+	for(int i =0; i < numVsG; i++){
+		partition[i] = 0;
+		ind[i] = i;
+	}
+	v0 = numVsG;
+	v1 = 0;*/
 	readFile();
 	//debugProblem();
 	int tid;
@@ -78,7 +86,7 @@ int main(int argc, char *argv[]){
 	}
 
 }
- test(inputFile,assignG);
+test(inputFile,assignG);
 }
 
 

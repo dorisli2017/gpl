@@ -203,10 +203,12 @@ void Process<T>::setAssignment(){
 
 template<class T>
 void Process<T>::optimal(){
+	cout<< "start optimal";
 	int rct;
 	while(true){
 		for(int i = 0; i < maxFlips; i++){
 			for(int j = 0; j < maxSteps; j++){
+				//cout<<unsatCs.size()<<endl;
 				if (unsatCs.size()== 0){
 					cout<< "s SATISFIABLE"<< endl;
 					//debugAssign();
