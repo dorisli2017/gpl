@@ -76,6 +76,7 @@ void printUsage(){
 
 void test( string inputFile,vector<bool>& assign){
 	ifstream fp;
+    int cut = 0;
 	fp.open(inputFile,std::ios::in);
 	if(!fp.is_open()){
 		perror("read file fails");
@@ -95,11 +96,13 @@ void test( string inputFile,vector<bool>& assign){
    	while(!fp.eof()){
 		getline(fp,buff);
 		if(buff.empty()) break;
-		testLine(buff,assign);
+		testLine(buff,assign, &cut);
    	}
+   	assert(cut+c0+c1==numCsG);
+   	assert(v0+v1== numVsG+1);
    	cout<< "tested" << endl;
 }
-void testLine(string line, vector<bool>& assign){
+void testLine(string line, vector<bool>& assign, int* cut){
 	char* str = strdup(line.c_str());
     const char s[2] = " ";
     int lit;
@@ -117,7 +120,10 @@ void testLine(string line, vector<bool>& assign){
 			continue;
 		}
 		if(*token == '0'){
-			if(q0 >0 && q1>0) return;
+			if(q0 >0 && q1>0){
+				(*cut)++;
+				 return;
+			}
 			if(numT == 0){
 				perror("TEST FAILURE");
 				exit(EXIT_FAILURE);

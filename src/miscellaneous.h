@@ -13,7 +13,7 @@ void debugProblem();
 void printVariables();
 void printClauses();
 void test( string inputFile,vector<bool>& assign);
-void testLine(string line,vector<bool>& assign);
+void testLine(string line, vector<bool>& assign, int* cut);
 
 
 
