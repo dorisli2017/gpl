@@ -18,15 +18,15 @@ int main(int argc, char *argv[]){
 		const vector<double>& setD = setDD[tid];
 		Process process(setB, setI,setD);
 		while(!satis()){
+			#pragma omp barrier
 			if(tid == 0){
 				process.optimal(true, false, true);
 			}
 			if(tid == 1){
 				process.optimal(false,true , true);
 			}
+			process.combineR();
 			#pragma omp barrier
-			process.combineP();
-
 		}
 		cout<< "SATIS";
 		test(true, true, true, assignG);
@@ -398,20 +398,12 @@ void Process::optimal(bool p0, bool p1, bool pc){
 		assign[i] = assignG[i];
 	}
 	setAssignment();
-	while(true){
-		for(unsigned int i = 0; i < maxFlips; i++){
-			for(unsigned int j = 0; j < maxSteps; j++){
-				if (unsatCs.size()== 0){
-					//debugAssign();
-					//sat = true;
-					//test(f0,f1,c,assign);
-					//cout<< tid<<" SATISFIABLE"<< endl;
-					//printAssignment();
-					return;
-				}
-				search_prob();
+	for(unsigned int i = 0; i < maxFlips; i++){
+		for(unsigned int j = 0; j < maxSteps; j++){
+			if (unsatCs.size()== 0){
+				return;
 			}
-			//if(sat) return;
+			search_prob();
 		}
 		rct = (this->*randINT)()%100;
 		if(rct < rct1) randomAssignment();
@@ -530,6 +522,7 @@ void testLine(string line,vector<bool>& assign){
 		}
 		if(*token == '0'){
 			if(numT == 0){
+				cout<< fileName<<endl;
 				perror("TEST FAILURE");
 				exit(EXIT_FAILURE);
 			}
