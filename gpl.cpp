@@ -7,31 +7,37 @@
 
 #include "gpl.h"
 int main(int argc, char *argv[]){
-	fileName = argv[1];
-	part();
-	readFile();
-	#pragma omp parallel num_threads(2)
-	{
-		int tid = omp_get_thread_num();
-		const vector<bool>setB = setBB[tid];
-		const vector<int> setI =setII[tid];
-		const vector<double>& setD = setDD[tid];
-		Process process(setB, setI,setD);
-		while(!satis()){
-			#pragma omp barrier
-			if(tid == 0){
-				process.optimal(true, false, true);
-			}
-			if(tid == 1){
-				process.optimal(false,true , true);
-			}
-			process.combineR();
-			#pragma omp barrier
+	readFile(argv[1]);
+	Process process0(setBB[0], setII[0],setDD[0]);
+	Process process1(setBB[1], setII[1],setDD[1]);
+	process0.setJob(true, false, true);
+	process0.setAssignment();
+	process1.setJob(false,true, true);
+	process1.setAssignment();
+	while(true){
+		process0.tid = 0;
+		process0.optimal();
+		process1.tid = 1;
+		process1.optimal();
+		for(int i =0; i < numVs; i++){
+			if(vs[i] == 0 || vs[i] == 1) assert(assignG[i] != 1);
 		}
-		cout<< "SATIS";
-		test(true, true, true, assignG);
-		abort();
-	}// parallel version
+		for(int i =0; i < numVs; i++){
+			if(vs[i] == 0){assignG[i]=process0.assign[i]; continue;}
+			if(vs[i] == 1){assignG[i]=process1.assign[i]; continue;}
+			assignG[i]+= process0.assign[i];
+			assignG[i]+= process1.assign[i];
+		}
+		assert(assignG.size() == numVs);
+		if(satis()) break;
+		process0.combineAssign();
+		process1.combineAssign();
+	}
+	cout<< "SATIS"<<endl;
+	for(int i = 0;i < assignG.size(); i++){
+		cout<< assignG[i]<< " ";
+	}
+	test(argv[1],true, true, true, assignG);
 	return 0;
 }
 
@@ -41,13 +47,9 @@ void debugProblem(){
 	printClauses();
 	cout<<"vs:" <<endl;
 	for(int i = 0; i < numVs; i++){
-		cout<<i<<": "<<partition[i]<< " "<< vs[i]<<endl;
+		cout<<i<<": "<< " "<< vs[i]<<endl;
 	}
 	cout<< endl;
-	cout<<"cs:" <<endl;
-	for(int i =0; i < numCs; i++){
-		cout<<i<<": "<< cs[i]<<endl;
-	}
 	cout<< "Occurences:"<< endl;
 	for(int i = 1; i < numVs; i++){
 		cout<< i<< ":"<<posOc[i]<< " "<<negOc[i]<< endl;
@@ -55,10 +57,11 @@ void debugProblem(){
 }
 void Process::debugAssign(){
 	/* Testing code**********************************/
-		printOptions();
+		//printOptions();
 	   	printAssignment();
 	   	printUnsatCs();
 	   	printNumP();
+	   	cout<< "flips: "<< flips<<endl;
 
 
 	/*Testing code**********************************/
@@ -66,7 +69,7 @@ void Process::debugAssign(){
 }
 Process::Process(const vector<bool>& setB, const vector<int>& setI,const vector<double>& setD){
 	parseOptions(setB, setI,setD);
-	tid = omp_get_thread_num();
+	//tid = omp_get_thread_num();
 	if(tid == 0){
 		distribution0 = uniform_int_distribution<int>(0,INT_MAX);
 		generator0.seed(seed);
@@ -89,13 +92,32 @@ Process::Process(const vector<bool>& setB, const vector<int>& setI,const vector<
 	numP = (int*) malloc(sizeof(int) * numCs);
 	probs = (double*)malloc(sizeof(double) * numVs);
 	assign.reserve(numVs);
+	lookUpTable = (double*)malloc(sizeof(double) * maxLOcc);
+	lookUpTableI = (double*)malloc(sizeof(double) * maxLOcc);
+	lookUpTableO = (double*)malloc(sizeof(double) * maxLOcc);
 	//set lookuptable
 	switch (fct){
-	case 0:initLookUpTable_poly();
+	case 0:initLookUpTable_poly(0);
 			lookUp =&Process::LookUpTable_poly;
 			break;
-	default:initLookUpTable_exp();
+	default:initLookUpTable_exp(0);
 			lookUp =&Process::LookUpTable_exp;
+			break;
+	}
+	switch (fctI){
+	case 0:initLookUpTable_poly(1);
+			lookUpI =&Process::LookUpTable_poly;
+			break;
+	default:initLookUpTable_exp(1);
+			lookUpI =&Process::LookUpTable_exp;
+			break;
+	}
+	switch (fctO){
+	case 0:initLookUpTable_poly(2);
+			lookUpO =&Process::LookUpTable_poly;
+			break;
+	default:initLookUpTable_exp(2);
+			lookUpO =&Process::LookUpTable_exp;
 			break;
 	}
 }
@@ -107,22 +129,22 @@ void Process::parseOptions(const vector<bool>& setB, const vector<int>& setI,con
 	tabu_flag = setB[0];
 
 	maxFlips =setI[0];
-	maxSteps = setI[1];
-	fct= setI[2];
-	ict = setI[3];
-	rct1 = setI[4];
-	rct2 = setI[5];
-	cct= setI[6];
-	seed = setI[8];
-	cb=setD[0];
-	eps= setD[1];
-	lct = setD[2];
+	fct= setI[1];
+	ict = setI[2];
+	rct1 = setI[3];
+	rct2 = setI[4];
+	cct= setI[5];
+	seed = setI[7];
+	cb = setD[0];
+	cbI= setD[1];
+	cbO = setD[2];
+	eps= setD[3];
+	epsI= setD[4];
+	epsO= setD[5];
+	lct = setD[6];
 }
-// construct the Problem with fill information of the input file
-void readFile(){
-	//cout<< "in readFile"<<endl;
+void readFile(char* fileName){
 	ifstream fp;
-	//fp.open("Debug/instance.cnf",std::ios::in);
 	fp.open(fileName,std::ios::in);
 	if(!fp.is_open()){
 		perror("read file fails");
@@ -131,19 +153,19 @@ void readFile(){
 	string buff;
 	char head;
    	getline(fp,buff);
-   	// Get the p line
-   	while(!fp.eof()){
-		//cout<<buff<<endl;
-		//todo:parseLine
-   		if(buff.empty()) break;
-		head =buff.at(0);
-		if(head == 'p'){
-			memAllocate(buff);
-			break;
-		}
-	  getline(fp,buff);
-	}
-   	// Get the clauses
+	memAllocate(buff);
+	getline(fp,buff);
+	char* str = strdup(buff.c_str());
+    const char s[2] = " ";
+    char* token = strtok(str, s);
+    token = strtok(NULL, s);
+    int vIndex;
+    while(token != NULL){
+    	vIndex = atoi(token);
+    	if(vIndex < numV0) vs[vIndex] = 2;
+    	else  vs[vIndex] = 3;
+        token = strtok(NULL, s);
+    }
    	int index = -1;
    	int line = 0;
    	while(!fp.eof() && line < numCs){
@@ -154,36 +176,45 @@ void readFile(){
 		line++;
    	}
    	initialAssignment();
-};
+}
 void memAllocate(string buff){
-	parseLine(buff,-1);
+	char* str = strdup(buff.c_str());
+    const char s[2] = " ";
+	strtok(str, s);
+	strtok(NULL, s);
+	numVs = atoi(strtok(NULL, s))+1;
+	numV0 = atoi(strtok(NULL, s))+1;
+	numCs = atoi(strtok(NULL, s));
+	numC0 = atoi(strtok(NULL, s));
+	numCi = atoi(strtok(NULL, s));
 	clauses = new vector<int>[numCs];
 	posC= new vector<int>[numVs];
 	negC= new vector<int>[numVs];
-	cs = (int*) malloc(sizeof(int) * numCs);
 	vs = (int*) malloc(sizeof(int) * numVs);
 	posOc = (int*) malloc(sizeof(int) * numVs);
 	negOc = (int*) malloc(sizeof(int) * numVs);
 	for(int i = 0; i < numVs; i++){
 		posOc[i] = 0;
-		vs[i] = -1;
 	}
 	for(int i = 0; i < numVs; i++){
 		negOc[i] = 0;
 	}
+	for(int i = 0; i < numV0; i++){
+		vs[i] = 0;
+	}
+	for(int i = numV0; i < numVs; i++){
+		vs[i] = 1;
+	}
 	clauseT.reserve(numVs);
 	assignG.reserve(numVs);
+	for(int i =0; i < numVs; i++){
+		assignG.push_back(0);
+	}
+	assert(assignG.size() == numVs);
 }
 void parseLine(string line,int indexC){
 	char* str = strdup(line.c_str());
     const char s[2] = " ";
-    if( indexC == -1){
-    	strtok(str, s);
-		strtok(NULL, s);
-		numVs = atoi(strtok(NULL, s))+1;
-		numCs = atoi(strtok(NULL, s));
-		return;
-    }// for the p line
     int lit;
     int size;
     char* token = strtok(str, s);
@@ -198,36 +229,6 @@ void parseLine(string line,int indexC){
 		}
 		if(*token == '0'){
 			clauses[indexC] = clauseT;
-			// Todo: not efficient !
-			int j = partition[abs(clauseT[0])];
-			for(int i =1; i < clauseT.size(); i++){
-				if (j != partition[abs(clauseT[i])]){
-					j=2;
-					break;
-				}
-			}
-			switch(j){
-			case 0:{
-				cs[indexC]= 0;
-				for(int i=0; i < clauseT.size(); i++){
-					if(vs[abs(clauseT[i])] == -1) vs[abs(clauseT[i])] = 0;
-				}
-				break;}
-			case 1:{
-				cs[indexC]= 1;
-				for(int i=0; i < clauseT.size(); i++){
-					if(vs[abs(clauseT[i])] == -1) vs[abs(clauseT[i])] = 1;
-				}
-				break;}
-			case 2:{
-				cs[indexC]= 2;
-				for(int i=0; i < clauseT.size(); i++){
-
-					if(partition[abs(clauseT[i])]== 0) vs[abs(clauseT[i])] = 2;
-					else vs[abs(clauseT[i])] = 3;
-				}
-				break;}
-			}
 			clauseT.clear();
 		    return;
 		}
@@ -244,7 +245,6 @@ void Process::printOptions(){
 	printf("localSAT options: \n");
 	cout<<"c tabu_flag: "<<tabu_flag<<endl;
 	cout<<"c maxFlips: "<<maxFlips<<endl;
-	cout<<"c maxSteps: "<<maxSteps<<endl;
 	cout<<"c seed: "<<seed<<endl;
 	cout<<"c fct: "<<fct<<endl;
 	cout<<"c ict: "<<ict<<endl;
@@ -288,10 +288,12 @@ void printClauses(){
 void Process::printAssignment(){
 	cout<< "v ";
 	for(int i = 1; i < numVs; i++){
-		if(assign[i]) cout <<i<<" ";
-		else cout << -i<<" ";
+		if(assign[i] >= 2){cout <<i<<" ";continue;}
+		if(assign[i] <= -1){ cout <<-i<<" ";continue;}
+		if(assign[i] == 0){ cout << "*"<< i<<" ";continue;}
+		assert(false);
 	}
-	cout <<endl ;
+	cout <<endl;
 }
 void Process::printUnsatCs(){
 	cout<< "Unsatisfied clauses ";
@@ -322,46 +324,8 @@ void initialAssignment(){
 			else  posC[(*i)].push_back(j);
 		}
 	}
-	for(int i = 0; i < numVs; i++){
-			if(posOc[i] > negOc[i]){
-				assignG.push_back(true);
-			}
-			else{
-				assignG.push_back(false);
-			}
-	}
+	assignG.reserve(numVs);
 }
-void Process::biasAssignment(){
-	for(int i = 0; i < numVs; i++){
-			if(posOc[i] > negOc[i]){
-				assign[i] = true;
-			}
-			else{
-				assign[i] = false;
-			}
-	}
-	setAssignment();
-}
-void Process::randomBiasAssignment(){
-	int sum;
-	for(int i = 0; i < numVs; i++){
-		sum = posOc[i] +negOc[i];
-		if(sum == 0){
-			assign[i] = true;
-		}
-		else{
-			assign[i] = ((this->*randINT)()%sum)<posOc[i];
-		}
-	}
-	setAssignment();
-}
-void Process::randomAssignment(){
-   	for(int j = 0; j < numVs; j++){
-   		assign[j] = ((this->*randINT)()%2 ==1);
-   	}
-    setAssignment();
-}
-
 void Process::setAssignment(){
    	for(int i = 0; i < numCs; i++){
    		numP[i] = 0;
@@ -372,12 +336,12 @@ void Process::setAssignment(){
 		}
 	}
    	for(int j = 0; j < numVs; j++){
-		if(assign[j] == false){
+		if(assign[j] == -1){
 	   		for (std::vector<int>::const_iterator i = negC[j].begin(); i != negC[j].end(); ++i){
 	   			numP[*i]++;
 	   		}
 		}
-		else{
+		if(assign[j] == 2){
 			for (std::vector<int>::const_iterator i = posC[j].begin(); i != posC[j].end(); ++i){
 	   			numP[*i]++;
 			}
@@ -389,33 +353,70 @@ void Process::setAssignment(){
    		}
    	}
 }
-void Process::optimal(bool p0, bool p1, bool pc){
+void Process::setJob(bool p0, bool p1, bool pc){
 	f0=p0;
 	f1= p1;
 	c = pc;
-	int rct;
-	for(int i; i < numVs;i++){
-		assign[i] = assignG[i];
-	}
-	setAssignment();
-	for(unsigned int i = 0; i < maxFlips; i++){
-		for(unsigned int j = 0; j < maxSteps; j++){
-			if (unsatCs.size()== 0){
-				return;
+	if(f0){
+		p = 0;
+		inn = 2;
+		out = 3;
+		for(int i = 0; i < numV0; i++){
+			if(vs[i] == 2){
+				assign.push_back(0);
+				continue;
 			}
-			search_prob();
+			if(posOc[i] > negOc[i]){
+				assign.push_back(2);
+			}
+			else{
+				assign.push_back(-1);
+			}
 		}
-		rct = (this->*randINT)()%100;
-		if(rct < rct1) randomAssignment();
-		else{
-			if(rct< rct2) biasAssignment();
-			else randomBiasAssignment();
+		for(int i = numV0; i < numVs; i++){
+				assign.push_back(0);
+		}
+	}
+	else{
+		p = 1;
+		inn = 3;
+		out = 2;
+		for(int i = 0; i < numV0; i++){
+				assign.push_back(0);
+		}
+		for(int i = numV0; i < numVs; i++){
+			if(vs[i] == 3){
+				assign.push_back(0);
+				continue;
+			}
+			if(posOc[i] > negOc[i]){
+				assign.push_back(2);
+			}
+			else{
+				assign.push_back(-1);
+			}
+
+		}
+
+	}
+}
+void Process::optimal(){
+	for(unsigned int i = 0; i < maxFlips; i++){
+		if (unsatCs.size()== 0){
+				return;
+		}
+		for(int i =0; i < numVs; i++){
+			if(vs[i] == 0 || vs[i] == 1) assert(assign[i] != 1);
+		}
+		search_prob();
+		for(int i =0; i < numVs; i++){
+			if(vs[i] == 0 || vs[i] == 1) assert(assign[i] != 1);
 		}
 	}
 }
 int Process::getFlipLiteral(int cIndex){
 	vector<int>&  vList = clauses[cIndex];
-	int j=0,bre,min= numCs+1;
+	int j=0,bre,min= numCs+1,pat;
 	double sum=0,randD;
 	int greedyLiteral = 0, randomLiteral;
 	for (std::vector<int>::const_iterator i = vList.begin(); i != vList.end(); ++i){
@@ -425,11 +426,20 @@ int Process::getFlipLiteral(int cIndex){
 			min = bre;
 			greedyLiteral = *i;
 		}
+		pat = vs[abs(*i)];
 		if(bre < maxLOcc){
-		sum+= lookUpTable[bre];
+			if(pat== p) sum+= lookUpTable[bre];
+			else{
+				if(pat== inn) sum+= lookUpTableI[bre];
+				else sum+= lookUpTableO[bre];
+			}
 		}
 		else{
-		sum+=(this->*Process::lookUp)(bre);
+			if(pat== p) sum+=(this->*Process::lookUp)(bre);
+			else{
+				if(pat== inn) sum+=(this->*Process::lookUpI)(bre);
+				else sum+=(this->*Process::lookUpO)(bre);
+			}
 		}
 		probs[j]= sum;
 		j++;
@@ -451,28 +461,31 @@ int Process::getFlipLiteral(int cIndex){
 void Process::flip(int literal){
 	std::vector<int>::const_iterator i;
 	if(literal > 0){
-   		for (i = negC[literal].begin(); i != negC[literal].end(); ++i){
-   			numP[*i]--;
-   			if(numP[*i] == 0) pushBack(*i);
-   		}
 		for (i = posC[literal].begin(); i != posC[literal].end(); ++i){
    			numP[*i]++;
 		}
-
-		assign[literal] = true;
+		if(assign[literal] == -1){
+			for (i = negC[literal].begin(); i != negC[literal].end(); ++i){
+				numP[*i]--;
+				if(numP[*i] == 0) pushBack(*i);
+			}
+		}
+		assign[literal] =2;
 	}
 	else{
    		for (i = negC[-literal].begin(); i != negC[-literal].end(); ++i){
    			numP[*i]++;
    		}
-		for (i = posC[-literal].begin(); i != posC[-literal].end(); ++i){
-   			numP[*i]--;
-   			if(numP[*i] == 0) pushBack(*i);
-		}
-		assign[-literal]= false;
+   		if(assign[-literal] == 2){
+   			for (i = posC[-literal].begin(); i != posC[-literal].end(); ++i){
+   				numP[*i]--;
+   				if(numP[*i] == 0) pushBack(*i);
+   			}
+   		}
+		assign[-literal]= -1;
 	}
 }
-void test(bool f0, bool f1, bool fc,vector<bool>& assign){
+void test(char* fileName,bool f0, bool f1, bool fc,vector<int>& assign){
 #pragma omp critical
 {
 	ifstream fp;
@@ -487,7 +500,7 @@ void test(bool f0, bool f1, bool fc,vector<bool>& assign){
    	while(!fp.eof()){
    		if(buff.empty()) break;
 		head =buff.at(0);
-		if(head == 'p'){
+		if(head == 'i'){
 			break;
 		}
 	  getline(fp,buff);
@@ -496,18 +509,24 @@ void test(bool f0, bool f1, bool fc,vector<bool>& assign){
    	while(!fp.eof()){
 		getline(fp,buff);
 		if(buff.empty()) break;
-	switch(cs[i]){
-	case 0:{if(f0)	testLine(buff, assign);break;}
-	case 1:{if(f1)	testLine(buff, assign);break;}
-	case 2:{if(fc)	testLine(buff, assign);break;}
-	assert(false);
-	}
+		int cs;
+		if (i < numC0) cs = 0;
+		else{
+			if(i < numCi) cs = 2;
+			else cs =1;
+		}
+		switch(cs){
+		case 0:{if(f0)	testLine(buff, assign);break;}
+		case 1:{if(f1)	testLine(buff, assign);break;}
+		case 2:{if(fc)	testLine(buff, assign);break;}
+		assert(false);
+		}
 		i++;
    	}
    	cout<< "tested" << endl;
 }
 }
-void testLine(string line,vector<bool>& assign){
+void testLine(string line,vector<int>& assign){
 	char* str = strdup(line.c_str());
     const char s[2] = " ";
     int lit;
@@ -516,20 +535,20 @@ void testLine(string line,vector<bool>& assign){
     while(token != NULL){
 		if(*token== '-'){
 			lit = atoi(token);
-			if(assign[-lit] == false) numT++;
+			if(assign[-lit] <= -1) numT++;
 			token = strtok(NULL, s);
 			continue;
 		}
 		if(*token == '0'){
 			if(numT == 0){
-				cout<< fileName<<endl;
+				cout<< endl<<line;
 				perror("TEST FAILURE");
 				exit(EXIT_FAILURE);
 			}
 		    return;
 		}
 		lit = atoi(token);
-		if(assign[lit] == true) numT++;
+		if(assign[lit] >=2) numT++;
 		token = strtok(NULL, s);
     }
 	perror("a clause line does not terminates");
@@ -564,7 +583,14 @@ void Process::search_prob(){
 	int flipLindex = getFlipLiteral(flipCindex);
 	unsatCs[randC]=unsatCs.back();
 	unsatCs.pop_back();
+	for(int i =0; i < numVs; i++){
+		if(vs[i] == 0 || vs[i] == 1) assert(assign[i] != 1);
+	}
 	flip(flipLindex);
+	flips++;
+	for(int i =0; i < numVs; i++){
+		if(vs[i] == 0 || vs[i] == 1) assert(assign[i] != 1);
+	}
 	if(tabu_flag) tabuS[abs(flipLindex)]++;
 }
 
@@ -613,17 +639,29 @@ void printUsage(){
 	printf("---------------------------------------------------------------------------------\n");
 }
 
-void Process::initLookUpTable_exp(){
-
-	lookUpTable = (double*)malloc(sizeof(double) * maxLOcc);
+void Process::initLookUpTable_exp(int i){
+	double* l;
+	double cbX;
+	switch(i){
+	case 0:l = lookUpTable;cbX = cb; break;
+	case 1:l = lookUpTableI;cbX = cbI; break;
+	case 2:l = lookUpTableO;cbX= cbO; break;
+	}
 	for(int i = 0; i < maxLOcc;i++){
-		lookUpTable[i] = pow(cb,-i);
+		l[i] = pow(cbX,-i);
 	}
 }
-void Process::initLookUpTable_poly(){
-	lookUpTable = (double*)malloc(sizeof(double) * maxLOcc);
+void Process::initLookUpTable_poly(int i){
+	double* l;
+	double cbx;
+	double epsX;
+	switch(i){
+	case 0:l = lookUpTable;cbx = cb;epsX = eps; break;
+	case 1:l = lookUpTableI;cbx = cbI;epsX = epsI;break;
+	case 2:l = lookUpTableO;cbx= cbO; epsX = epsO;break;
+	}
 	for(int i = 0; i < maxLOcc;i++){
-		lookUpTable[i] = pow((eps+i),-cb);
+		l[i] = pow((epsX+i),-cbx);
 	}
 }
 double Process::LookUpTable_exp(int bre){
@@ -631,6 +669,18 @@ double Process::LookUpTable_exp(int bre){
 };
 double Process::LookUpTable_poly(int bre){
 	return pow((eps+bre),-cb);
+};
+double Process::LookUpTable_expI(int bre){
+	return pow(cbI,-bre);
+};
+double Process::LookUpTable_polyI(int bre){
+	return pow((epsI+bre),-cbI);
+};
+double Process::LookUpTable_expO(int bre){
+	return pow(cbO,-bre);
+};
+double Process::LookUpTable_polyO(int bre){
+	return pow((epsO+bre),-cbO);
 };
 int Process::randI0(){
 	return distribution0(generator0);
@@ -641,8 +691,13 @@ int Process::randI1(){
 };
 
 void Process::pushBack(int cIndex){
-	int p = cs[cIndex];
-	switch(p){
+	int pat;
+	if (cIndex < numC0) pat = 0;
+	else{
+		if(cIndex < numCi) pat = 2;
+		else pat =1;
+	}
+	switch(pat){
 	case 0:{if(f0)	unsatCs.push_back(cIndex);break;}
 	case 1:{if(f1)	unsatCs.push_back(cIndex);break;}
 	case 2:{if(c)	unsatCs.push_back(cIndex);break;}
@@ -652,28 +707,20 @@ void Process::pushBack(int cIndex){
 }
 
 bool satis(){
-	int count = 0;
-	for(int i =0; i < numCs; i++){
-		for (std::vector<int>::const_iterator j = clauses[i].begin(); j != clauses[i].end(); ++j){
-			if((*j) >0 && assignG[*j] == true) count++;
-			else{
-				if(*j <0 && assignG[-*j] == false) count++;
-			}
-		}
-		if(count ==0) return false;
-		count = 0;
+	for(int i =0; i < numVs; i++){
+		if(assignG[i] == 1) return false;
 	}
 	return true;
 }
 
-int setConflict(vector<bool>& assign){
+int setConflict(vector<int>& assign){
 	int conflict = 0;
 	int count = 0;
 	for(int i =0; i < numCs; i++){
 		for (std::vector<int>::const_iterator j = clauses[i].begin(); j != clauses[i].end(); ++j){
-			if((*j) >0 && assign[*j] == true) count++;
+			if((*j) >0 && assign[*j] == 1) count++;
 			else{
-				if(*j <0 && assign[-*j] == false) count++;
+				if(*j <0 && assign[-*j] == 0) count++;
 			}
 		}
 		if(count ==0) conflict++;
@@ -739,80 +786,27 @@ void Process::combineP(){
 		}
 	}
 }
-void readPartition(string file){
-	//partition.reserve(10);
-	partition.push_back(0);
-	//cout<< "in readFile"<<endl;
-	ifstream fp;
-	int ind = 1;
-	fp.open(file,std::ios::in);
-	//fp.open(partFile,std::ios::in);
-	if(!fp.is_open()){
-		perror("read partition fails");
-		exit(EXIT_FAILURE);
+
+void Process::combineAssign(){
+	int v;
+	for(int i =0; i < numVs; i++){
+		v = assignG[i];
+		if(v >= 2){ assign[i] = 2;continue;}
+		if(v <= -1){ assign[i] = -1;continue;}
+		if(v == 0){ assign[i] = 0; continue;}
+		if(v == 1){
+			if(vs[i] == inn)continue;
+			if(vs[i] == out){
+				if(assign[i] == -1){ assign[i] = 2; continue;};
+				if(assign[i] == 2){ assign[i] = -1; continue;};
+				continue;
+			}
+			cout<< vs[i];
+			assert(false);
+		}
+		assert(false);
 	}
-	string buff;
-   	getline(fp,buff);
-   	while(!fp.eof()){
-   		partition.push_back(stoi(buff));
-   		ind++;
-   	   	getline(fp,buff);
-
-   	}
-};
-void  part()
-{
-  string fileConvert = "fileConverter/fileConvert ";
-  fileConvert.append(string(fileName)).append(" p");
-  int sr =system (fileConvert.c_str());
-  if(sr == -1){
-	perror("fileConvert fails");
-	exit(EXIT_FAILURE);
-
-  }
-
-  string Kahypar = "../kahypar/build/kahypar/application/KaHyPar -h ";// other programm possible
-  string block = " -k 2";// numThreads
-  string imbalance = " -e 0.03";
-  string object = " -o km1";// km1 :(lambda-1) metric , cut: cut-net metric
-  string mode =" -m direct";// partition mode: direct: k-way, recursive: bisection recursive
-  string preset0 = " -p ../kahypar/config/km1_direct_kway_sea18.ini";
-  string preset1 = " -p ../../../config/km1_direct_kway_gecco18.ini";
-  string preset2 = " -p ../../../config/km1_direct_kway_sea17.ini";
-  string preset3 =" -p ../../../config/km1_direct_kway_alenex17.ini";
-  string preset4 =" -p ../../../config/cut_rb_alenex16.ini";
-  Kahypar.append(string( fileName).append(".p")).append(block).append(imbalance).append(object).append(mode).append(preset0).append("> /dev/null");
-  sr = system (Kahypar.c_str());
-  if(sr == -1){
-	perror("Kahypar fails");
-	exit(EXIT_FAILURE);
-
-  }
-  std::array<char, 128> buffer;
-  std::string result;
-  string a = "find ";
-  a.append(string( fileName).append("*.KaHyPar"));
- // cout<< a;
-  const char* cmd =a.c_str();
-  std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
-  if (!pipe) throw std::runtime_error("popen() failed!");
-  while (!feof(pipe.get())) {
-      if (fgets(buffer.data(), 128, pipe.get()) != nullptr){
-          result += buffer.data();
-      }
-  }
-  	result.pop_back();
-  	readPartition(result);
-    a = "rm ";
-    a.append(string( fileName)).append(".*");
-    sr = system (a.c_str());
-    if(sr == -1){
-  	perror("Remove files fails");
-  	exit(EXIT_FAILURE);
-
-    }
-
+	setAssignment();
 }
-
 
 
