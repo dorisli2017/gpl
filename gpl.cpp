@@ -8,18 +8,19 @@
 #include "gpl.h"
 int main(int argc, char *argv[]){
 	readFile(argv[1]);
+	//debugProblem();
 	Process process0(setBB[0], setII[0],setDD[0]);
-	Process process1(setBB[1], setII[1],setDD[1]);
-	process0.setJob(true, false, true);
+	//Process process1(setBB[1], setII[1],setDD[1]);
+	process0.setJob(true, false, false);
 	process0.setAssignment();
-	process1.setJob(false,true, true);
-	process1.setAssignment();
-	while(true){
+	//process1.setJob(false,true, true);
+	//process1.setAssignment();
+	//while(true){
 		process0.tid = 0;
 		process0.optimal();
-		process1.tid = 1;
-		process1.optimal();
-		for(int i =0; i < numVs; i++){
+		//process1.tid = 1;
+		//process1.optimal();
+		/*for(int i =0; i < numVs; i++){
 			if(vs[i] == 0 || vs[i] == 1) assert(assignG[i] != 1);
 		}
 		for(int i =0; i < numVs; i++){
@@ -32,12 +33,21 @@ int main(int argc, char *argv[]){
 		if(satis()) break;
 		process0.combineAssign();
 		process1.combineAssign();
-	}
+	}*/
 	cout<< "SATIS"<<endl;
-	for(int i = 0;i < assignG.size(); i++){
-		cout<< assignG[i]<< " ";
+
+	/*if(inter){
+		for(int i = 0;i < assignG.size(); i++){
+			cout<< assignG[i]<< " ";
+		}
 	}
-	test(argv[1],true, true, true, assignG);
+	else{
+		for(int i = 0;i < process0.assign.size(); i++){
+			cout<< process0.assign[i]<< " ";
+		}
+	}*/
+	if(inter )test(argv[1],true, false, false, process0.assign);
+	if(!inter)test(argv[1],true, true, true, process0.assign);
 	return 0;
 }
 
@@ -152,20 +162,37 @@ void readFile(char* fileName){
 	}
 	string buff;
 	char head;
-   	getline(fp,buff);
-	memAllocate(buff);
 	getline(fp,buff);
-	char* str = strdup(buff.c_str());
-    const char s[2] = " ";
-    char* token = strtok(str, s);
-    token = strtok(NULL, s);
-    int vIndex;
-    while(token != NULL){
-    	vIndex = atoi(token);
-    	if(vIndex < numV0) vs[vIndex] = 2;
-    	else  vs[vIndex] = 3;
-        token = strtok(NULL, s);
-    }
+	while(!fp.eof()){
+   		if(buff.empty()) break;
+		head =buff.at(0);
+		if(head == 'p'){
+			memAllocate(buff);
+			break;
+		}
+	  getline(fp,buff);
+	}
+	if(inter){
+		while(!fp.eof()){
+			if(buff.empty()) break;
+			head =buff.at(0);
+			if(head == 'i'){
+				char* str = strdup(buff.c_str());
+					const char s[2] = " ";
+					char* token = strtok(str, s);
+					token = strtok(NULL, s);
+					int vIndex;
+					while(token != NULL){
+						vIndex = atoi(token);
+						if(vIndex < numV0) vs[vIndex] = 2;
+						else  vs[vIndex] = 3;
+						token = strtok(NULL, s);
+					}
+				break;
+			}
+		  getline(fp,buff);
+		}
+	}
    	int index = -1;
    	int line = 0;
    	while(!fp.eof() && line < numCs){
@@ -175,18 +202,28 @@ void readFile(char* fileName){
 		parseLine(buff, index);
 		line++;
    	}
+   	assert(line == numCs);
    	initialAssignment();
 }
 void memAllocate(string buff){
 	char* str = strdup(buff.c_str());
     const char s[2] = " ";
 	strtok(str, s);
-	strtok(NULL, s);
-	numVs = atoi(strtok(NULL, s))+1;
-	numV0 = atoi(strtok(NULL, s))+1;
-	numCs = atoi(strtok(NULL, s));
-	numC0 = atoi(strtok(NULL, s));
-	numCi = atoi(strtok(NULL, s));
+	if(inter){
+		numVs = atoi(strtok(NULL, s))+1;
+		numV0 = atoi(strtok(NULL, s))+1;
+		numCs = atoi(strtok(NULL, s));
+		numC0 = atoi(strtok(NULL, s));
+		numCi = atoi(strtok(NULL, s));
+	}
+	else{
+		strtok(NULL, s);
+		numVs = atoi(strtok(NULL, s))+1;
+		numV0 = numVs;
+		numCs = atoi(strtok(NULL, s));
+		numC0 = numCs;
+		numCi = numCs;
+	}
 	clauses = new vector<int>[numCs];
 	posC= new vector<int>[numVs];
 	negC= new vector<int>[numVs];
@@ -279,9 +316,11 @@ void printVariables(){
    	}
 }
 void printClauses(){
+
 	cout<< "Clauses "<< ": " << endl ;
    	for(int i = 0; i < numCs; i++){
    		cout<< "Clause "<< i<< ": " ;
+   		assert(clauses[i].size() > 0);
    		printVector(clauses[i]);
    	}
 }
@@ -405,16 +444,11 @@ void Process::optimal(){
 		if (unsatCs.size()== 0){
 				return;
 		}
-		for(int i =0; i < numVs; i++){
-			if(vs[i] == 0 || vs[i] == 1) assert(assign[i] != 1);
-		}
 		search_prob();
-		for(int i =0; i < numVs; i++){
-			if(vs[i] == 0 || vs[i] == 1) assert(assign[i] != 1);
-		}
 	}
 }
 int Process::getFlipLiteral(int cIndex){
+	assert(clauses[cIndex].size()> 0);
 	vector<int>&  vList = clauses[cIndex];
 	int j=0,bre,min= numCs+1,pat;
 	double sum=0,randD;
@@ -427,6 +461,7 @@ int Process::getFlipLiteral(int cIndex){
 			greedyLiteral = *i;
 		}
 		pat = vs[abs(*i)];
+		assert(p == 0);
 		if(bre < maxLOcc){
 			if(pat== p) sum+= lookUpTable[bre];
 			else{
@@ -446,13 +481,18 @@ int Process::getFlipLiteral(int cIndex){
 	}
 	randD = ((double)(this->*randINT)()/RAND_MAX)*sum;
 	assert(randD >= 0);
-	for(int i = 0; i < j;i++){
+	assert(randD <= probs[j-1]);
+	assert(j < numVs);
+	int i;
+	for(i = 0; i < j;i++){
 		if(probs[i]< randD){
+			assert(i < j-1);
 			continue;
 		}
 		randomLiteral= vList[i];
 		break;
 	}
+	assert(abs(randomLiteral) < numVs);
 	if(tabu_flag &&tabuS[abs(greedyLiteral)] < tabuS[abs(randomLiteral)]){
 		return greedyLiteral;
 	}
@@ -462,6 +502,7 @@ void Process::flip(int literal){
 	std::vector<int>::const_iterator i;
 	if(literal > 0){
 		for (i = posC[literal].begin(); i != posC[literal].end(); ++i){
+			assert(*i< numCs);
    			numP[*i]++;
 		}
 		if(assign[literal] == -1){
@@ -471,6 +512,7 @@ void Process::flip(int literal){
 			}
 		}
 		assign[literal] =2;
+
 	}
 	else{
    		for (i = negC[-literal].begin(); i != negC[-literal].end(); ++i){
@@ -581,16 +623,13 @@ void Process::search_prob(){
 		return;
 	}
 	int flipLindex = getFlipLiteral(flipCindex);
+	assert(abs(flipLindex) < numVs);
 	unsatCs[randC]=unsatCs.back();
 	unsatCs.pop_back();
-	for(int i =0; i < numVs; i++){
-		if(vs[i] == 0 || vs[i] == 1) assert(assign[i] != 1);
-	}
+	//cout<< "A"<<endl;
 	flip(flipLindex);
+	//cout<< "B"<<endl;
 	flips++;
-	for(int i =0; i < numVs; i++){
-		if(vs[i] == 0 || vs[i] == 1) assert(assign[i] != 1);
-	}
 	if(tabu_flag) tabuS[abs(flipLindex)]++;
 }
 
@@ -683,11 +722,13 @@ double Process::LookUpTable_polyO(int bre){
 	return pow((epsO+bre),-cbO);
 };
 int Process::randI0(){
-	return distribution0(generator0);
+	//return distribution0(generator0);
+	return rand();
 };
 
 int Process::randI1(){
-	return distribution0(generator0);
+	//return distribution0(generator0);
+	return rand();
 };
 
 void Process::pushBack(int cIndex){
