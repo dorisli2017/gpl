@@ -37,9 +37,11 @@ const vector<vector<double>> setDD = {{3.6, 1.0,0.5},{3.6, 1.0,0.5}};
 
 
 /*problem and assignment*/
-char* fileName;
 int numCs;
+int numC0;
+int numCi;
 int numVs;
+int numV0;
 vector<int>* clauses;
 vector<int>* posC;
 vector<int>* negC;
@@ -50,17 +52,15 @@ vector<int> clauseT;
 vector <bool> assignG;
 
 bool sat = false;
-
-vector<int> partition;
+bool inter = true;
 int* vs;//0 for P0, 1 for P1, 2 for boundary of P0, 3 for boundary of P1.-1 for unused ones.
-int* cs;//0 for P0, 1 for P1, 2 for cut
 /*methods*/
 uniform_int_distribution<int> distribution0;
 uniform_int_distribution<int> distribution1;
 minstd_rand generator0;
 minstd_rand0 generator1;
 void readPartition(string file);
-void readFile();
+void readFile(char* fileName);
 void memAllocate(string buff);
 void parseLine(string line, int index);
 void initialAssignment();
@@ -71,15 +71,12 @@ int getFlipCandidate_wa(int cIndex);
 int getFlipCandidate_max(int cIndex);
 void printVector(vector<int>& vec);
 void printUsage();
-void test(bool f0, bool f1, bool fc,vector<bool>& assignment);
+void test(char* fileName,bool f0, bool f1, bool fc,vector<bool>& assignment);
 void testLine(string line,vector<bool>& assign);
 bool satis();
 int setConflict(vector<bool>& assign);
-void  part();
-void readPartition(string file);
 
 class Process{
-	int tid;
 	int seed;
 	int* numP;
 	vector<int> unsatCs;
@@ -106,6 +103,7 @@ class Process{
 
 
 public:
+	int tid;
 	vector<bool> assign;
 	Process(const vector<bool>& setB, const vector<int>& setI,const vector<double>& setD);
 	void optimal(bool p0, bool p1, bool c);

@@ -7,31 +7,20 @@
 
 #include "gpl.h"
 int main(int argc, char *argv[]){
-	fileName = argv[1];
-	part();
-	readFile();
-	#pragma omp parallel num_threads(2)
-	{
-		int tid = omp_get_thread_num();
-		const vector<bool>setB = setBB[tid];
-		const vector<int> setI =setII[tid];
-		const vector<double>& setD = setDD[tid];
-		Process process(setB, setI,setD);
-		while(!satis()){
-			#pragma omp barrier
-			if(tid == 0){
-				process.optimal(true, false, true);
-			}
-			if(tid == 1){
-				process.optimal(false,true , true);
-			}
-			process.combineR();
-			#pragma omp barrier
+	readFile(argv[1]);
+	//debugProblem();
+	Process process0(setBB[0], setII[0],setDD[0]);
+	process0.tid = 0;
+	Process process1(setBB[1], setII[1],setDD[1]);
+	process1.tid = 1;
+	while(!satis()){
+		process0.optimal(true, false, true);
+		process1.optimal(false,true , true);
+		process0.combineR();
+		process1.combineR();
 		}
-		cout<< "SATIS";
-		test(true, true, true, assignG);
-		abort();
-	}// parallel version
+	cout<< "SATIS";
+	test(argv[1],true, true, true, assignG);
 	return 0;
 }
 
@@ -41,13 +30,9 @@ void debugProblem(){
 	printClauses();
 	cout<<"vs:" <<endl;
 	for(int i = 0; i < numVs; i++){
-		cout<<i<<": "<<partition[i]<< " "<< vs[i]<<endl;
+		cout<<i<<": "<< " "<< vs[i]<<endl;
 	}
 	cout<< endl;
-	cout<<"cs:" <<endl;
-	for(int i =0; i < numCs; i++){
-		cout<<i<<": "<< cs[i]<<endl;
-	}
 	cout<< "Occurences:"<< endl;
 	for(int i = 1; i < numVs; i++){
 		cout<< i<< ":"<<posOc[i]<< " "<<negOc[i]<< endl;
@@ -66,7 +51,6 @@ void Process::debugAssign(){
 }
 Process::Process(const vector<bool>& setB, const vector<int>& setI,const vector<double>& setD){
 	parseOptions(setB, setI,setD);
-	tid = omp_get_thread_num();
 	if(tid == 0){
 		distribution0 = uniform_int_distribution<int>(0,INT_MAX);
 		generator0.seed(seed);
@@ -118,11 +102,8 @@ void Process::parseOptions(const vector<bool>& setB, const vector<int>& setI,con
 	eps= setD[1];
 	lct = setD[2];
 }
-// construct the Problem with fill information of the input file
-void readFile(){
-	//cout<< "in readFile"<<endl;
+void readFile(char* fileName){
 	ifstream fp;
-	//fp.open("Debug/instance.cnf",std::ios::in);
 	fp.open(fileName,std::ios::in);
 	if(!fp.is_open()){
 		perror("read file fails");
@@ -130,11 +111,8 @@ void readFile(){
 	}
 	string buff;
 	char head;
-   	getline(fp,buff);
-   	// Get the p line
-   	while(!fp.eof()){
-		//cout<<buff<<endl;
-		//todo:parseLine
+	getline(fp,buff);
+	while(!fp.eof()){
    		if(buff.empty()) break;
 		head =buff.at(0);
 		if(head == 'p'){
@@ -143,47 +121,88 @@ void readFile(){
 		}
 	  getline(fp,buff);
 	}
-   	// Get the clauses
+	if(inter){
+		while(!fp.eof()){
+			if(buff.empty()) break;
+			head =buff.at(0);
+			if(head == 'c'){
+				char* str = strdup(buff.c_str());
+					const char s[2] = " ";
+					char* token = strtok(str, s);
+					token = strtok(NULL, s);
+					int vIndex;
+					while(token != NULL){
+						vIndex = atoi(token);
+						if(vIndex < numV0) vs[vIndex] = 2;
+						else  vs[vIndex] = 3;
+						token = strtok(NULL, s);
+					}
+				break;
+			}
+		  getline(fp,buff);
+		}
+	}
    	int index = -1;
    	int line = 0;
-   	while(!fp.eof() && line < numCs){
+	while(!fp.eof() && line < numCs){
    		index++;
 		getline(fp,buff);
 		if(buff.empty()) break;
 		parseLine(buff, index);
 		line++;
    	}
-   	initialAssignment();
-};
+   	assert(line == numCs);
+	initialAssignment();
+}
 void memAllocate(string buff){
-	parseLine(buff,-1);
+	char* str = strdup(buff.c_str());
+    const char s[2] = " ";
+	strtok(str, s);
+	if(inter){
+		numVs = atoi(strtok(NULL, s))+1;
+		numV0 = atoi(strtok(NULL, s))+1;
+		numCs = atoi(strtok(NULL, s));
+		numC0 = atoi(strtok(NULL, s));
+		numCi = atoi(strtok(NULL, s));
+	}
+	else{
+		strtok(NULL, s);
+		numVs = atoi(strtok(NULL, s))+1;
+		//numV0 = numVs;
+		numV0 = 1;
+		numCs = atoi(strtok(NULL, s));
+		numC0 = 0;
+		numCi = 0;
+	}
 	clauses = new vector<int>[numCs];
 	posC= new vector<int>[numVs];
 	negC= new vector<int>[numVs];
-	cs = (int*) malloc(sizeof(int) * numCs);
 	vs = (int*) malloc(sizeof(int) * numVs);
 	posOc = (int*) malloc(sizeof(int) * numVs);
 	negOc = (int*) malloc(sizeof(int) * numVs);
 	for(int i = 0; i < numVs; i++){
 		posOc[i] = 0;
-		vs[i] = -1;
 	}
 	for(int i = 0; i < numVs; i++){
 		negOc[i] = 0;
 	}
+	for(int i = 0; i < numV0; i++){
+		vs[i] = 0;
+	}
+	for(int i = numV0; i < numVs; i++){
+		vs[i] = 1;
+	}
 	clauseT.reserve(numVs);
 	assignG.reserve(numVs);
+	for(int i =0; i < numVs; i++){
+		assignG.push_back(0);
+	}
+	assert(assignG.size() == numVs);
 }
+
 void parseLine(string line,int indexC){
 	char* str = strdup(line.c_str());
     const char s[2] = " ";
-    if( indexC == -1){
-    	strtok(str, s);
-		strtok(NULL, s);
-		numVs = atoi(strtok(NULL, s))+1;
-		numCs = atoi(strtok(NULL, s));
-		return;
-    }// for the p line
     int lit;
     int size;
     char* token = strtok(str, s);
@@ -198,36 +217,6 @@ void parseLine(string line,int indexC){
 		}
 		if(*token == '0'){
 			clauses[indexC] = clauseT;
-			// Todo: not efficient !
-			int j = partition[abs(clauseT[0])];
-			for(int i =1; i < clauseT.size(); i++){
-				if (j != partition[abs(clauseT[i])]){
-					j=2;
-					break;
-				}
-			}
-			switch(j){
-			case 0:{
-				cs[indexC]= 0;
-				for(int i=0; i < clauseT.size(); i++){
-					if(vs[abs(clauseT[i])] == -1) vs[abs(clauseT[i])] = 0;
-				}
-				break;}
-			case 1:{
-				cs[indexC]= 1;
-				for(int i=0; i < clauseT.size(); i++){
-					if(vs[abs(clauseT[i])] == -1) vs[abs(clauseT[i])] = 1;
-				}
-				break;}
-			case 2:{
-				cs[indexC]= 2;
-				for(int i=0; i < clauseT.size(); i++){
-
-					if(partition[abs(clauseT[i])]== 0) vs[abs(clauseT[i])] = 2;
-					else vs[abs(clauseT[i])] = 3;
-				}
-				break;}
-			}
 			clauseT.clear();
 		    return;
 		}
@@ -472,9 +461,7 @@ void Process::flip(int literal){
 		assign[-literal]= false;
 	}
 }
-void test(bool f0, bool f1, bool fc,vector<bool>& assign){
-#pragma omp critical
-{
+void test(char* fileName,bool f0, bool f1, bool fc,vector<bool>& assign){
 	ifstream fp;
 	fp.open(fileName,std::ios::in);
 	if(!fp.is_open()){
@@ -487,7 +474,7 @@ void test(bool f0, bool f1, bool fc,vector<bool>& assign){
    	while(!fp.eof()){
    		if(buff.empty()) break;
 		head =buff.at(0);
-		if(head == 'p'){
+		if(head == 'c'){
 			break;
 		}
 	  getline(fp,buff);
@@ -496,16 +483,21 @@ void test(bool f0, bool f1, bool fc,vector<bool>& assign){
    	while(!fp.eof()){
 		getline(fp,buff);
 		if(buff.empty()) break;
-	switch(cs[i]){
-	case 0:{if(f0)	testLine(buff, assign);break;}
-	case 1:{if(f1)	testLine(buff, assign);break;}
-	case 2:{if(fc)	testLine(buff, assign);break;}
-	assert(false);
-	}
+		int cs;
+		if (i < numC0) cs = 0;
+		else{
+			if(i < numCi) cs = 2;
+			else cs =1;
+		}
+		switch(cs){
+		case 0:{if(f0)	testLine(buff, assign);break;}
+		case 1:{if(f1)	testLine(buff, assign);break;}
+		case 2:{if(fc)	testLine(buff, assign);break;}
+		assert(false);
+		}
 		i++;
    	}
    	cout<< "tested" << endl;
-}
 }
 void testLine(string line,vector<bool>& assign){
 	char* str = strdup(line.c_str());
@@ -522,7 +514,6 @@ void testLine(string line,vector<bool>& assign){
 		}
 		if(*token == '0'){
 			if(numT == 0){
-				cout<< fileName<<endl;
 				perror("TEST FAILURE");
 				exit(EXIT_FAILURE);
 			}
@@ -641,14 +632,18 @@ int Process::randI1(){
 };
 
 void Process::pushBack(int cIndex){
-	int p = cs[cIndex];
-	switch(p){
+	int pat;
+	if (cIndex < numC0) pat = 0;
+	else{
+		if(cIndex < numCi) pat = 2;
+		else pat =1;
+	}
+	switch(pat){
 	case 0:{if(f0)	unsatCs.push_back(cIndex);break;}
 	case 1:{if(f1)	unsatCs.push_back(cIndex);break;}
 	case 2:{if(c)	unsatCs.push_back(cIndex);break;}
 	assert(false);
 	}
-
 }
 
 bool satis(){
@@ -739,80 +734,5 @@ void Process::combineP(){
 		}
 	}
 }
-void readPartition(string file){
-	//partition.reserve(10);
-	partition.push_back(0);
-	//cout<< "in readFile"<<endl;
-	ifstream fp;
-	int ind = 1;
-	fp.open(file,std::ios::in);
-	//fp.open(partFile,std::ios::in);
-	if(!fp.is_open()){
-		perror("read partition fails");
-		exit(EXIT_FAILURE);
-	}
-	string buff;
-   	getline(fp,buff);
-   	while(!fp.eof()){
-   		partition.push_back(stoi(buff));
-   		ind++;
-   	   	getline(fp,buff);
-
-   	}
-};
-void  part()
-{
-  string fileConvert = "fileConverter/fileConvert ";
-  fileConvert.append(string(fileName)).append(" p");
-  int sr =system (fileConvert.c_str());
-  if(sr == -1){
-	perror("fileConvert fails");
-	exit(EXIT_FAILURE);
-
-  }
-
-  string Kahypar = "../kahypar/build/kahypar/application/KaHyPar -h ";// other programm possible
-  string block = " -k 2";// numThreads
-  string imbalance = " -e 0.03";
-  string object = " -o km1";// km1 :(lambda-1) metric , cut: cut-net metric
-  string mode =" -m direct";// partition mode: direct: k-way, recursive: bisection recursive
-  string preset0 = " -p ../kahypar/config/km1_direct_kway_sea18.ini";
-  string preset1 = " -p ../../../config/km1_direct_kway_gecco18.ini";
-  string preset2 = " -p ../../../config/km1_direct_kway_sea17.ini";
-  string preset3 =" -p ../../../config/km1_direct_kway_alenex17.ini";
-  string preset4 =" -p ../../../config/cut_rb_alenex16.ini";
-  Kahypar.append(string( fileName).append(".p")).append(block).append(imbalance).append(object).append(mode).append(preset0).append("> /dev/null");
-  sr = system (Kahypar.c_str());
-  if(sr == -1){
-	perror("Kahypar fails");
-	exit(EXIT_FAILURE);
-
-  }
-  std::array<char, 128> buffer;
-  std::string result;
-  string a = "find ";
-  a.append(string( fileName).append("*.KaHyPar"));
- // cout<< a;
-  const char* cmd =a.c_str();
-  std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
-  if (!pipe) throw std::runtime_error("popen() failed!");
-  while (!feof(pipe.get())) {
-      if (fgets(buffer.data(), 128, pipe.get()) != nullptr){
-          result += buffer.data();
-      }
-  }
-  	result.pop_back();
-  	readPartition(result);
-    a = "rm ";
-    a.append(string( fileName)).append(".*");
-    sr = system (a.c_str());
-    if(sr == -1){
-  	perror("Remove files fails");
-  	exit(EXIT_FAILURE);
-
-    }
-
-}
-
 
 
