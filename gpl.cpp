@@ -9,20 +9,17 @@
 int main(int argc, char *argv[]){
 	readFile(argv[1]);
 	//debugProblem();
-	//Process process0(setBB[0], setII[0],setDD[0]);
+	Process process0(setBB[0], setII[0],setDD[0]);
 	Process process1(setBB[1], setII[1],setDD[1]);
-	//process0.setJob(true, false, false);
-	//process0.setAssignment();
-	process1.setJob(false,true,false);
+	process0.setJob(true, false,true);
+	process0.setAssignment();
+	process1.setJob(false,true,true);
 	process1.setAssignment();
-	//while(true){
-		//process0.tid = 0;
-		//process0.optimal();
+	while(true){
+		process0.tid = 0;
+		process0.optimal();
 		process1.tid = 1;
 		process1.optimal();
-		/*for(int i =0; i < numVs; i++){
-			if(vs[i] == 0 || vs[i] == 1) assert(assignG[i] != 1);
-		}
 		for(int i =0; i < numVs; i++){
 			if(vs[i] == 0){assignG[i]=process0.assign[i]; continue;}
 			if(vs[i] == 1){assignG[i]=process1.assign[i]; continue;}
@@ -33,21 +30,21 @@ int main(int argc, char *argv[]){
 		if(satis()) break;
 		process0.combineAssign();
 		process1.combineAssign();
-	}*/
+	}
 	cout<< "SATIS"<<endl;
 
-	/*if(inter){
+/*	if(inter){
 		for(int i = 0;i < assignG.size(); i++){
 			cout<< assignG[i]<< " ";
 		}
 	}
-	else{
-		for(int i = 0;i < process0.assign.size(); i++){
-			cout<< process0.assign[i]<< " ";
-		}
-	}*/
-	if(inter )test(argv[1],true, false, false, process1.assign);
-	if(!inter)test(argv[1],false, false, true, process1.assign);
+*/
+/*	if(inter )test(argv[1],true, false, true, process0.assign);
+	if(!inter)test(argv[1],true, false, true, process0.assign);
+	if(inter )test(argv[1],false, true, true, process1.assign);
+	if(!inter)test(argv[1],false, true, true, process1.assign);
+	*/
+	test(argv[1],true, true, true, assignG);
 	return 0;
 }
 
@@ -462,7 +459,6 @@ int Process::getFlipLiteral(int cIndex){
 			greedyLiteral = *i;
 		}
 		pat = vs[abs(*i)];
-		assert(p == 1);
 		if(bre < maxLOcc){
 			if(pat== p) sum+= lookUpTable[bre];
 			else{
@@ -616,12 +612,17 @@ double Process::func_poly(int literal){
 	return pow((eps+computeBreakScore(literal)),-cb);
 }
 void Process::search_prob(){
-	int randC = (this->*randINT)()%unsatCs.size();
+	int size = unsatCs.size();
+	int randC = (this->*randINT)()%size;
 	int flipCindex = unsatCs[randC];
-	if(numP[flipCindex] > 0){
+	while(numP[flipCindex] > 0){
 		unsatCs[randC]=unsatCs.back();
 		unsatCs.pop_back();
-		return;
+		size--;
+		if(size == 0) return;
+		randC = (this->*randINT)()%size;
+		flipCindex = unsatCs[randC];
+
 	}
 	int flipLindex = getFlipLiteral(flipCindex);
 	assert(abs(flipLindex) < numVs);

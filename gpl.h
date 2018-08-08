@@ -29,11 +29,11 @@
 #include <functional>
 #include <memory>
 using namespace std;
-bool inter = false;
+bool inter = true;
 const vector<vector<bool>> setBB= {{false},{false}};
 // maxFlips, maxSteps,fct,ict,rct1,rct2,cct,gen,seed
 const vector<vector<int>> setII= {{INT_MAX,2,1,100,0,50,0,0}, {INT_MAX,1,2,1,100,0,50,1,0}};
-const vector<vector<double>> setDD = {{3.6,4.5,5.0,1.0,2.0,3.0,0.5},{3.6,4.5,5.0, 1.0,2.0,3.0,0.5}};
+const vector<vector<double>> setDD = {{3.6,3.6,3.6,1.0,2.0,3.0,0.5},{3.6,3.6,5.0, 1.0,2.0,3.0,0.5}};
 
 
 /*problem and assignment*/
