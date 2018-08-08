@@ -9,17 +9,17 @@
 int main(int argc, char *argv[]){
 	readFile(argv[1]);
 	//debugProblem();
-	Process process0(setBB[0], setII[0],setDD[0]);
-	//Process process1(setBB[1], setII[1],setDD[1]);
-	process0.setJob(true, false, false);
-	process0.setAssignment();
-	//process1.setJob(false,true, true);
-	//process1.setAssignment();
+	//Process process0(setBB[0], setII[0],setDD[0]);
+	Process process1(setBB[1], setII[1],setDD[1]);
+	//process0.setJob(true, false, false);
+	//process0.setAssignment();
+	process1.setJob(false,true,false);
+	process1.setAssignment();
 	//while(true){
-		process0.tid = 0;
-		process0.optimal();
-		//process1.tid = 1;
-		//process1.optimal();
+		//process0.tid = 0;
+		//process0.optimal();
+		process1.tid = 1;
+		process1.optimal();
 		/*for(int i =0; i < numVs; i++){
 			if(vs[i] == 0 || vs[i] == 1) assert(assignG[i] != 1);
 		}
@@ -46,8 +46,8 @@ int main(int argc, char *argv[]){
 			cout<< process0.assign[i]<< " ";
 		}
 	}*/
-	if(inter )test(argv[1],true, false, false, process0.assign);
-	if(!inter)test(argv[1],true, true, true, process0.assign);
+	if(inter )test(argv[1],true, false, false, process1.assign);
+	if(!inter)test(argv[1],false, false, true, process1.assign);
 	return 0;
 }
 
@@ -219,10 +219,11 @@ void memAllocate(string buff){
 	else{
 		strtok(NULL, s);
 		numVs = atoi(strtok(NULL, s))+1;
-		numV0 = numVs;
+		//numV0 = numVs;
+		numV0 = 1;
 		numCs = atoi(strtok(NULL, s));
-		numC0 = numCs;
-		numCi = numCs;
+		numC0 = 0;
+		numCi = 0;
 	}
 	clauses = new vector<int>[numCs];
 	posC= new vector<int>[numVs];
@@ -461,7 +462,7 @@ int Process::getFlipLiteral(int cIndex){
 			greedyLiteral = *i;
 		}
 		pat = vs[abs(*i)];
-		assert(p == 0);
+		assert(p == 1);
 		if(bre < maxLOcc){
 			if(pat== p) sum+= lookUpTable[bre];
 			else{
