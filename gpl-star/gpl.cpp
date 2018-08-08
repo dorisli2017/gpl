@@ -33,12 +33,12 @@ int main(int argc, char *argv[]){
 	}
 	cout<< "SATIS"<<endl;
 
-/*	if(inter){
+	if(inter){
 		for(int i = 0;i < assignG.size(); i++){
 			cout<< assignG[i]<< " ";
 		}
 	}
-*/
+
 /*	if(inter )test(argv[1],true, false, true, process0.assign);
 	if(!inter)test(argv[1],true, false, true, process0.assign);
 	if(inter )test(argv[1],false, true, true, process1.assign);
