@@ -1,2 +1,2 @@
-timeout 2m /usr/bin/time -f "wtime=%e" ./plf $1 &> $1.plf101
+timeout 10m /usr/bin/time -f "wtime=%e" ./gpl $1 &> $1.gpl
 
